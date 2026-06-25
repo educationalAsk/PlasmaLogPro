@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlasmaLog Pro | Decentralized Biometrics</title>
+    <!-- Tailwind CSS for Responsive Premium UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for smooth biological curve rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CryptoJS for secure SHA-256 local-block hashing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
+        
+        :root {
+            --brand-primary: #6366f1;
+            --brand-success: #10b981;
+            --bg-main: #f8fafc;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-main);
+            color: #0f172a;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+
+        .bento-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .bento-card:hover {
+            box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        .metric-btn, .scope-btn, .nav-tab {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .metric-btn.active, .nav-tab.active {
+            background-color: #0f172a;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        }
+
+        .scope-btn.active {
+            background-color: #6366f1;
+            color: white;
+            border-color: #6366f1;
+        }
+
+        .chart-container { height: 450px; width: 100%; position: relative; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        .status-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .pulse-green { animation: pulse 2s infinite; background-color: #10b981; }
+        .pulse-red { animation: pulse 2s infinite; background-color: #ef4444; }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin { animation: rotate 1s linear infinite; }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            font-size: 0.875rem;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: #6366f1;
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .editable-row { cursor: pointer; }
+        .editable-row:hover { background-color: rgba(241, 245, 249, 0.6) !important; }
+        
+        .editing-mode {
+            border: 2px solid #6366f1 !important;
+            background-color: #f5f3ff !important;
+        }
+
+        @media (max-width: 1024px) {
+            .bento-grid { grid-template-columns: 1fr; }
+            .chart-container { height: 350px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <nav class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3">
+        <div class="max-w-[1600px] mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-black rounded-lg flex items-center justify-center text-white text-lg">⛓️</div>
+                <div class="hidden sm:block">
+                    <h1 class="text-md font-bold tracking-tight text-slate-900 leading-none">PlasmaLog <span class="text-indigo-600">Chain</span></h1>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center mt-1">
+                        <span id="chain-status-indicator" class="status-pulse pulse-green"></span> 
+                        <span id="chain-status-text">Biological Ledger Valid</span>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 bg-slate-100 p-1 rounded-xl">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab active px-4 py-1.5 text-xs font-bold rounded-lg">Dashboard</button>
+                <button onclick="switchTab('exercise')" id="tab-exercise" class="nav-tab px-4 py-1.5 text-xs font-bold rounded-lg">Exercise Log</button>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button onclick="exportData()" class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors" title="Export Local Backup">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <div class="hidden md:block text-right border-r border-slate-100 pr-4">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase">Total Career Payout</p>
+                    <p id="stat-revenue" class="text-sm font-black text-slate-900 mono">$0.00</p>
+                </div>
+                <div class="flex flex-col items-end">
+                    <p class="text-[9px] font-bold text-slate-400 uppercase">Blocks</p>
+                    <p id="block-height" class="text-sm font-black text-indigo-600 mono">0</p>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Views -->
+    <main id="view-dashboard" class="max-w-[1600px] mx-auto p-6 space-y-6">
+        <!-- Analytics Section -->
+        <div class="bento-card">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                <div class="flex items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Biometric & Financial Forecasting</h2>
+                        <p id="scope-description" class="text-xs text-slate-400 font-medium">Displaying last <span class="text-indigo-600 font-bold">5</span> visits</p>
+                    </div>
+                    <button onclick="manualRefresh()" id="refresh-btn" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400" title="Verify & Refresh Ledger">
+                        <svg id="refresh-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                    </button>
+                </div>
+                
+                <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner">
+                    <button onclick="setScope(5)" data-scope="5" class="scope-btn active px-4 py-1.5 text-xs font-bold rounded-lg">5</button>
+                    <button onclick="setScope(10)" data-scope="10" class="scope-btn px-4 py-1.5 text-xs font-bold rounded-lg">10</button>
+                    <button onclick="setScope(20)" data-scope="20" class="scope-btn px-4 py-1.5 text-xs font-bold rounded-lg">20</button>
+                    <button onclick="setScope(50)" data-scope="50" class="scope-btn px-4 py-1.5 text-xs font-bold rounded-lg">ALL</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bento-grid">
+            <!-- Left Column: Manual Entry, JSON Load, and Selection controls -->
+            <div class="col-span-12 lg:col-span-4 space-y-6">
+                <!-- Data Entry Card with Correction Support -->
+                <div id="editor-container" class="bento-card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 id="form-title" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Manual Log Entry</h3>
+                        <button onclick="cancelEdit()" id="cancel-edit-btn" class="hidden text-[10px] font-bold text-red-500 hover:underline">CANCEL CORRECTION</button>
+                    </div>
+                    <form id="biometric-form" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Donation Date</label>
+                                <input type="date" id="log-date" required class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Weight (lbs)</label>
+                                <input type="number" step="0.1" id="log-weight" placeholder="185.0" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pulse (BPM)</label>
+                                <input type="number" id="log-pulse" placeholder="72" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Temp (°F)</label>
+                                <input type="number" step="0.1" id="log-temp" placeholder="98.6" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Hematocrit (%)</label>
+                                <input type="number" step="0.1" id="log-hct" placeholder="45.0" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">BP (Sys)</label>
+                                <input type="number" id="log-sys" placeholder="120" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">BP (Dia)</label>
+                                <input type="number" id="log-dia" placeholder="80" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Protein (g/dL)</label>
+                                <input type="number" step="0.1" id="log-protein" placeholder="7.2" class="form-input">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Payout ($)</label>
+                                <input type="number" step="0.01" id="log-earnings" placeholder="50.00" class="form-input">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Bank Account Balance ($) (Day of Visit)</label>
+                                <input type="number" step="0.01" id="log-bank-balance" placeholder="2500.00" class="form-input">
+                            </div>
+                        </div>
+                        <button type="submit" id="submit-btn" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all mt-2">Append Biometric Block</button>
+                    </form>
+                </div>
+
+                <!-- Load Local Device JSON Card -->
+                <div class="bento-card bg-indigo-600 text-white border-none shadow-xl">
+                    <h4 class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-2 font-black">Load data from local device</h4>
+                    <p class="text-[9px] opacity-70 mb-4">Import biometric transaction history or structural training logs directly from local device backup files.</p>
+                    <label class="cursor-pointer block">
+                        <input type="file" id="load-data-input" accept=".json" class="hidden" onchange="importData(event)">
+                        <div class="w-full py-3 rounded-xl bg-white/20 text-center text-xs font-bold hover:bg-white/30 transition-all uppercase tracking-tight">Select and Load JSON</div>
+                    </label>
+                </div>
+
+                <!-- Metric Toggle Panels -->
+                <div class="bento-card">
+                    <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">View Metric</h3>
+                    <div class="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                        <button onclick="setMetric('weight')" data-metric="weight" class="metric-btn active flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Weight</span>
+                            <span class="text-[10px] font-bold text-slate-400">LBS</span>
+                        </button>
+                        <button onclick="setMetric('blood_pressure')" data-metric="blood_pressure" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Blood Pressure</span>
+                            <span class="text-[10px] font-bold text-slate-400">mmHg</span>
+                        </button>
+                        <button onclick="setMetric('pulse')" data-metric="pulse" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Pulse</span>
+                            <span class="text-[10px] font-bold text-slate-400">BPM</span>
+                        </button>
+                        <button onclick="setMetric('temperature')" data-metric="temperature" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Temperature</span>
+                            <span class="text-[10px] font-bold text-slate-400">°F</span>
+                        </button>
+                        <button onclick="setMetric('protein')" data-metric="protein" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Protein</span>
+                            <span class="text-[10px] font-bold text-slate-400">G/DL</span>
+                        </button>
+                        <button onclick="setMetric('hematocrit')" data-metric="hematocrit" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Hematocrit</span>
+                            <span class="text-[10px] font-bold text-slate-400">%</span>
+                        </button>
+                        <button onclick="setMetric('bank_balance')" data-metric="bank_balance" class="metric-btn flex items-center justify-between p-3 rounded-xl border border-slate-100">
+                            <span class="text-xs font-bold uppercase">Bank Balance</span>
+                            <span class="text-[10px] font-bold text-slate-400">USD</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- OCR Ingestion Sandbox -->
+                <div class="bento-card bg-black text-white border-none shadow-xl">
+                    <h4 class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-2">Mine Biometrics (OCR)</h4>
+                    <p class="text-[9px] opacity-60 mb-3">Upload your donor portal screenshots (CSL Plasma, BioLife, etc.) to extract biological nodes securely using multimodal intelligence.</p>
+                    <label class="cursor-pointer block mt-4">
+                        <input type="file" id="ingest-input" multiple accept="image/*" class="hidden" onchange="processImport(event)">
+                        <div class="w-full py-3 rounded-xl bg-white/10 text-center text-xs font-bold hover:bg-white/20 transition-all uppercase tracking-tight">Mine Screenshots</div>
+                    </label>
+                    
+                    <div id="ingest-progress-container" class="hidden mt-6 space-y-2">
+                        <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-tighter">
+                            <span id="ingest-status" class="text-indigo-400">Mining...</span>
+                            <span id="ingest-count" class="opacity-60">0/0</span>
+                        </div>
+                        <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div id="ingest-progress-bar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column: Ledger Panel -->
+            <div class="col-span-12 lg:col-span-8">
+                <div class="bento-card overflow-hidden !p-0">
+                    <div class="p-4 border-b border-slate-100 bg-white sticky top-0 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Transaction Ledger</h3>
+                            <p class="text-[9px] text-slate-400 italic mt-0.5">Click rows to initiate dynamic correction checks</p>
+                        </div>
+                        <span class="text-[9px] font-bold text-indigo-500 uppercase">Interactive correction mode active</span>
+                    </div>
+                    <div class="overflow-x-auto custom-scrollbar h-[750px]">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-[9px] font-bold text-slate-400 uppercase sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-3">Date</th>
+                                    <th class="px-4 py-3">Weight</th>
+                                    <th class="px-4 py-3">BP (Sys/Dia)</th>
+                                    <th class="px-4 py-3">Pulse</th>
+                                    <th class="px-4 py-3">Temp</th>
+                                    <th class="px-4 py-3">Hct %</th>
+                                    <th class="px-4 py-3">Protein</th>
+                                    <th class="px-4 py-3">Bank Bal.</th>
+                                    <th class="px-4 py-3 text-right">Payout</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-body" class="text-xs font-medium text-slate-600 divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- EXERCISE MODULE VIEW -->
+    <main id="view-exercise" class="hidden max-w-[1600px] mx-auto p-6">
+        <div class="bento-grid">
+            <div class="col-span-12 lg:col-span-5 space-y-6">
+                <div class="bento-card">
+                    <h2 class="text-xl font-extrabold text-slate-900 tracking-tight mb-6">Log Training Session</h2>
+                    <form id="workout-form" class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Workout Date</label>
+                            <input type="date" id="exercise-date" class="form-input">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Category</label>
+                            <select id="exercise-type" class="form-input font-medium text-slate-700">
+                                <option value="Resistance Training">Resistance Training (Strength/Hypertrophy)</option>
+                                <option value="Cardiovascular">Cardiovascular Training (Aerobic/Anaerobic)</option>
+                                <option value="Plyometrics">Plyometrics (Power/Explosiveness)</option>
+                                <option value="Bodyweight">Bodyweight / Yoga / Pilates</option>
+                                <option value="Mobility">Mobility & Dynamic Stretching</option>
+                                <option value="Active Recovery">Active Recovery & Myofascial Release</option>
+                                <option value="MetCon">Metabolic Conditioning (MetCon)</option>
+                                <option value="Skill-Based">Skill-Based / Technical Training</option>
+                                <option value="Corrective">Corrective Exercise & Rehab</option>
+                                <option value="Combat Sports">Combat Sports & Martial Arts</option>
+                                <option value="Low-Impact">Low-Impact / Aquatic Training</option>
+                                <option value="Outdoor">Outdoor / Rucking / Hiking</option>
+                                <option value="Mind-Body">Mind-Body / Breathwork & Meditation</option>
+                                <option value="Isometrics">Isometrics (Static Strength)</option>
+                                <option value="Hybrid">Hybrid / Multi-modal Training</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Session Vitals / Activity Notes</label>
+                            <textarea id="exercise-notes" placeholder="Note down exertion metrics, target RPE, sets, reps or hydration details..." class="form-input h-32 resize-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase">Append Training Node</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-span-12 lg:col-span-7">
+                <div class="bento-card overflow-hidden !p-0">
+                    <div class="p-4 border-b border-slate-100 bg-white flex justify-between items-center">
+                        <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Exercise History</h3>
+                        <div id="workout-count" class="text-[10px] font-black bg-slate-100 px-2.5 py-1.5 rounded-lg text-slate-600">0 ENTRIES</div>
+                    </div>
+                    <div id="exercise-history-list" class="custom-scrollbar h-[550px] overflow-y-auto p-4 space-y-4"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 1. Proof-of-Authority Block Structure Definition
+        class Block {
+            constructor(index, data, previousHash = '') {
+                this.index = index;
+                this.timestamp = new Date().toISOString();
+                this.data = data;
+                this.previousHash = previousHash;
+                this.hash = this.calculateHash();
+            }
+            calculateHash() {
+                return CryptoJS.SHA256(
+                    this.index + 
+                    this.previousHash + 
+                    this.timestamp + 
+                    JSON.stringify(this.data)
+                ).toString();
+            }
+        }
+
+        // 2. Global State Variable Setup
+        let workouts = [];
+        let plasmaRecords = [];
+        let activeMetric = 'weight';
+        let activeScope = 5;
+        let mainChart = null;
+        let isEditing = false;
+        let editingDate = null;
+        const apiKey = ""; // Managed dynamically inside the frame runtime
+
+        // 3. Storage and State Loading logic
+        function saveState() {
+            localStorage.setItem('plasma_workouts', JSON.stringify(workouts));
+            localStorage.setItem('plasma_chain_v1', JSON.stringify(plasmaRecords));
+        }
+
+        function loadState() {
+            workouts = JSON.parse(localStorage.getItem('plasma_workouts') || '[]');
+            const saved = localStorage.getItem('plasma_chain_v1');
+            
+            if (saved) {
+                plasmaRecords = JSON.parse(saved);
+                verifyChainIntegrity();
+            } else {
+                // Generate Genesis block if empty
+                plasmaRecords = [new Block(0, { genesis: true })];
+                // Insert some realistic historical demo data to populate charts on first view
+                insertMockHistoricalData();
+            }
+        }
+
+        function insertMockHistoricalData() {
+            const today = new Date();
+            const demoVisits = [
+                { offset: 28, weight: 184.2, pulse: 68, temp: 98.2, hematocrit: 44.5, bp_sys: 118, bp_dia: 76, protein: 7.0, earnings: 60.00, bank_balance: 1420.00 },
+                { offset: 21, weight: 185.0, pulse: 72, temp: 98.4, hematocrit: 45.0, bp_sys: 120, bp_dia: 78, protein: 7.2, earnings: 60.00, bank_balance: 1480.00 },
+                { offset: 14, weight: 184.6, pulse: 70, temp: 98.6, hematocrit: 44.2, bp_sys: 122, bp_dia: 80, protein: 7.1, earnings: 75.00, bank_balance: 1555.00 },
+                { offset: 7,  weight: 186.1, pulse: 74, temp: 98.5, hematocrit: 46.1, bp_sys: 124, bp_dia: 82, protein: 7.3, earnings: 75.00, bank_balance: 1630.00 },
+                { offset: 0,  weight: 185.5, pulse: 71, temp: 98.3, hematocrit: 45.4, bp_sys: 119, bp_dia: 79, protein: 7.2, earnings: 90.00, bank_balance: 1720.00 }
+            ];
+
+            demoVisits.forEach((visit, idx) => {
+                const dateString = new Date(today.getTime() - (visit.offset * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                const data = {
+                    date: dateString,
+                    weight: visit.weight,
+                    pulse: visit.pulse,
+                    temp: visit.temp,
+                    hematocrit: visit.hematocrit,
+                    bp_sys: visit.bp_sys,
+                    bp_dia: visit.bp_dia,
+                    protein: visit.protein,
+                    earnings: visit.earnings,
+                    bank_balance: visit.bank_balance
+                };
+                const prevHash = plasmaRecords[plasmaRecords.length - 1]?.hash || '0';
+                plasmaRecords.push(new Block(plasmaRecords.length, data, prevHash));
+            });
+            saveState();
+        }
+
+        // 4. Verify Cryptographic Integrity across Block Links
+        function verifyChainIntegrity() {
+            let isValid = true;
+            for (let i = 1; i < plasmaRecords.length; i++) {
+                const currentBlock = plasmaRecords[i];
+                const previousBlock = plasmaRecords[i - 1];
+
+                // Check link validation
+                if (currentBlock.previousHash !== previousBlock.hash) {
+                    isValid = false;
+                    break;
+                }
+            }
+
+            const statusIndicator = document.getElementById('chain-status-indicator');
+            const statusText = document.getElementById('chain-status-text');
+
+            if (isValid) {
+                statusIndicator.className = "status-pulse pulse-green";
+                statusText.textContent = "Biological Ledger Valid";
+            } else {
+                statusIndicator.className = "status-pulse pulse-red";
+                statusText.textContent = "Chain Integrity Altered!";
+            }
+        }
+
+        // 5. Data Portability Actions (Import / Export JSON)
+        function exportData() {
+            const payload = {
+                version: "1.2",
+                exportedAt: new Date().toISOString(),
+                plasmaRecords: plasmaRecords,
+                workouts: workouts
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ledger_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    const validRecords = imported.plasmaRecords && Array.isArray(imported.plasmaRecords);
+                    const validWorkouts = !imported.workouts || Array.isArray(imported.workouts);
+
+                    if (validRecords && validWorkouts) {
+                        plasmaRecords = imported.plasmaRecords;
+                        workouts = imported.workouts || [];
+                        saveState();
+                        verifyChainIntegrity();
+                        refreshUI();
+                        renderWorkouts();
+                        showNotification("Ledger Restored Successfully");
+                    } else if (Array.isArray(imported)) {
+                        // Compatibility fallbacks for legacy raw transaction lists
+                        const formattedRecords = [new Block(0, { genesis: true })];
+                        imported.forEach((item) => {
+                            if (item.date) {
+                                const prevHash = formattedRecords[formattedRecords.length - 1]?.hash || '0';
+                                formattedRecords.push(new Block(formattedRecords.length, item, prevHash));
+                            }
+                        });
+                        plasmaRecords = formattedRecords;
+                        saveState();
+                        verifyChainIntegrity();
+                        refreshUI();
+                        showNotification("Raw Array Restored Successfully");
+                    } else {
+                        showNotification("Unsupported JSON Structure", true);
+                    }
+                } catch (err) {
+                    showNotification("Import Failure (Invalid JSON)", true);
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function showNotification(msg, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 px-6 py-3 rounded-xl text-white font-bold text-xs shadow-2xl z-[100] transform transition-all ${isError ? 'bg-red-500' : 'bg-slate-900'}`;
+            toast.textContent = msg.toUpperCase();
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 500); }, 3000);
+        }
+
+        // 6. Navigation Tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            document.getElementById('view-dashboard').classList.toggle('hidden', tab !== 'dashboard');
+            document.getElementById('view-exercise').classList.toggle('hidden', tab !== 'exercise');
+            if (tab === 'dashboard') updateChart();
+            else renderWorkouts();
+        }
+
+        // 7. Dynamic Block Editing and Corrections
+        function startEditing(date) {
+            const block = plasmaRecords.find(r => r.data && r.data.date === date);
+            if (!block) return;
+
+            isEditing = true;
+            editingDate = date;
+
+            document.getElementById('editor-container').classList.add('editing-mode');
+            document.getElementById('form-title').textContent = "Correcting Erroneous Block";
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').textContent = "Verify & Update Block";
+            document.getElementById('submit-btn').classList.replace('bg-slate-900', 'bg-indigo-600');
+
+            const d = block.data;
+            document.getElementById('log-date').value = d.date;
+            document.getElementById('log-weight').value = d.weight || '';
+            document.getElementById('log-pulse').value = d.pulse || '';
+            document.getElementById('log-temp').value = d.temp || '';
+            document.getElementById('log-hct').value = d.hematocrit || '';
+            document.getElementById('log-sys').value = d.bp_sys || '';
+            document.getElementById('log-dia').value = d.bp_dia || '';
+            document.getElementById('log-protein').value = d.protein || '';
+            document.getElementById('log-earnings').value = d.earnings || '';
+            document.getElementById('log-bank-balance').value = d.bank_balance || '';
+
+            document.getElementById('log-date').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            editingDate = null;
+            document.getElementById('biometric-form').reset();
+            document.getElementById('log-date').valueAsDate = new Date();
+
+            document.getElementById('editor-container').classList.remove('editing-mode');
+            document.getElementById('form-title').textContent = "Manual Log Entry";
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+            document.getElementById('submit-btn').textContent = "Append Biometric Block";
+            document.getElementById('submit-btn').classList.replace('bg-indigo-600', 'bg-slate-900');
+        }
+
+        // 8. Submit Manual Input / Correction Forms
+        document.getElementById('biometric-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const entry = {
+                date: document.getElementById('log-date').value,
+                weight: parseFloat(document.getElementById('log-weight').value) || null,
+                pulse: parseInt(document.getElementById('log-pulse').value) || null,
+                temp: parseFloat(document.getElementById('log-temp').value) || null,
+                hematocrit: parseFloat(document.getElementById('log-hct').value) || null,
+                bp_sys: parseInt(document.getElementById('log-sys').value) || null,
+                bp_dia: parseInt(document.getElementById('log-dia').value) || null,
+                protein: parseFloat(document.getElementById('log-protein').value) || null,
+                earnings: parseFloat(document.getElementById('log-earnings').value) || 0,
+                bank_balance: parseFloat(document.getElementById('log-bank-balance').value) || null
+            };
+
+            if (isEditing) {
+                const idx = plasmaRecords.findIndex(r => r.data && r.data.date === editingDate);
+                if (idx !== -1) {
+                    plasmaRecords[idx].data = entry;
+                    plasmaRecords[idx].timestamp = new Date().toISOString();
+                    // Recalculate block signature
+                    plasmaRecords[idx].hash = CryptoJS.SHA256(
+                        plasmaRecords[idx].index + 
+                        plasmaRecords[idx].previousHash + 
+                        plasmaRecords[idx].timestamp + 
+                        JSON.stringify(entry)
+                    ).toString();
+                    showNotification("Block Updated & Verified");
+                }
+                cancelEdit();
+            } else {
+                const existsIdx = plasmaRecords.findIndex(r => r.data && r.data.date === entry.date);
+                if (existsIdx !== -1) {
+                    plasmaRecords[existsIdx].data = entry;
+                    showNotification("Block Updated");
+                } else {
+                    const prevHash = plasmaRecords[plasmaRecords.length - 1]?.hash || '0';
+                    plasmaRecords.push(new Block(plasmaRecords.length, entry, prevHash));
+                    showNotification("Block Appended");
+                }
+            }
+
+            saveState();
+            verifyChainIntegrity();
+            refreshUI();
+            e.target.reset();
+            document.getElementById('log-date').valueAsDate = new Date();
+        });
+
+        // 9. Render Tables & Ledger Outputs
+        function refreshUI() {
+            const body = document.getElementById('log-body');
+            const rev = document.getElementById('stat-revenue');
+            const height = document.getElementById('block-height');
+            if(!body) return;
+
+            const sorted = plasmaRecords.filter(b => b.data && !b.data.genesis).sort((a,b) => new Date(b.data.date) - new Date(a.data.date));
+            const display = sorted.slice(0, activeScope);
+
+            body.innerHTML = display.map(b => `
+                <tr class="editable-row group" onclick="startEditing('${b.data.date}')">
+                    <td class="px-4 py-4 font-bold text-slate-900 flex items-center gap-2">
+                        ${b.data.date}
+                        <svg class="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </td>
+                    <td class="px-4 py-4 font-medium text-slate-500">${b.data.weight || '--'}</td>
+                    <td class="px-4 py-4 text-[11px]">${b.data.bp_sys ? `${b.data.bp_sys}/${b.data.bp_dia}` : '--'}</td>
+                    <td class="px-4 py-4 mono">${b.data.pulse || '--'}</td>
+                    <td class="px-4 py-4">${b.data.temp ? `${b.data.temp}°` : '--'}</td>
+                    <td class="px-4 py-4 font-bold text-slate-800">${b.data.hematocrit ? `${b.data.hematocrit}%` : '--'}</td>
+                    <td class="px-4 py-4 text-indigo-600 font-bold">${b.data.protein || '--'}</td>
+                    <td class="px-4 py-4 font-semibold text-slate-700">${b.data.bank_balance ? `$${parseFloat(b.data.bank_balance).toFixed(2)}` : '--'}</td>
+                    <td class="px-4 py-4 text-right font-bold text-emerald-600">$${(parseFloat(b.data.earnings) || 0).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            if(rev) rev.textContent = '$' + sorted.reduce((acc, curr) => acc + (parseFloat(curr.data.earnings) || 0), 0).toFixed(2);
+            if(height) height.textContent = sorted.length;
+            updateChart();
+        }
+
+        function setMetric(m) {
+            activeMetric = m;
+            document.querySelectorAll('.metric-btn').forEach(b => b.classList.toggle('active', b.dataset.metric === m));
+            updateChart();
+        }
+
+        function setScope(s) {
+            activeScope = s;
+            document.querySelectorAll('.scope-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.scope) === s));
+            const desc = document.getElementById('scope-description');
+            if(desc) desc.innerHTML = `Displaying last <span class="text-indigo-600 font-bold">${s === 50 ? 'All' : s}</span> visits`;
+            refreshUI();
+        }
+
+        // 10. Smooth Cubic Spline Chart.js Implementation
+        function updateChart() {
+            const canvas = document.getElementById('mainChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const sorted = plasmaRecords.filter(b => b.data && !b.data.genesis).sort((a,b) => new Date(a.data.date) - new Date(b.data.date));
+            const dataSlice = sorted.slice(-activeScope);
+            if (dataSlice.length === 0) { if (mainChart) mainChart.destroy(); return; }
+
+            const config = {
+                weight: { key: 'weight', color: '#6366f1', label: 'WEIGHT (LBS)' },
+                blood_pressure: { key: 'bp_sys', color: '#ef4444', label: 'SYSTOLIC BP' },
+                pulse: { key: 'pulse', color: '#f59e0b', label: 'PULSE (BPM)' },
+                temperature: { key: 'temp', color: '#06b6d4', label: 'TEMPERATURE (°F)' },
+                protein: { key: 'protein', color: '#8b5cf6', label: 'PROTEIN (G/DL)' },
+                hematocrit: { key: 'hematocrit', color: '#10b981', label: 'HEMATOCRIT (%)' },
+                bank_balance: { key: 'bank_balance', color: '#ec4899', label: 'BANK ACCOUNT BALANCE ($)' }
+            };
+
+            const labels = dataSlice.map(b => b.data.date.split('-').slice(1).join('/'));
+            const datasets = [{
+                label: config[activeMetric].label,
+                data: dataSlice.map(b => parseFloat(b.data[config[activeMetric].key]) || 0),
+                borderColor: config[activeMetric].color,
+                tension: 0.4, // Cubic-spline smoothing tension
+                borderWidth: 4,
+                pointRadius: 4,
+                pointBackgroundColor: '#fff',
+                fill: true,
+                backgroundColor: config[activeMetric].color + '05'
+            }];
+
+            if (activeMetric === 'blood_pressure') {
+                datasets.push({
+                    label: 'DIASTOLIC BP',
+                    data: dataSlice.map(b => parseFloat(b.data.bp_dia) || 0),
+                    borderColor: '#3b82f6',
+                    tension: 0.4,
+                    borderWidth: 4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#fff'
+                });
+            }
+
+            if (mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { 
+                            display: true, 
+                            position: 'top',
+                            labels: { font: { size: 10, weight: 'bold', family: 'Inter' } } 
+                        } 
+                    },
+                    scales: {
+                        y: { 
+                            grid: { color: '#f1f5f9' }, 
+                            ticks: { font: { family: 'JetBrains Mono', size: 10 } },
+                            // Dynamically suppress zero to maximize rendering curve clarity
+                            grace: '10%'
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { font: { family: 'JetBrains Mono', size: 10 } } 
+                        }
+                    }
+                }
+            });
+        }
+
+        // 11. Multi-modal Gemini OCR Screenshot Mining
+        async function processImport(e) {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            const container = document.getElementById('ingest-progress-container');
+            const bar = document.getElementById('ingest-progress-bar');
+            const status = document.getElementById('ingest-status');
+            const countLabel = document.getElementById('ingest-count');
+            container.classList.remove('hidden');
+            let successCount = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const currentIdx = i + 1;
+                status.textContent = `Mining Screen ${currentIdx}...`;
+                countLabel.textContent = `${currentIdx}/${files.length}`;
+                bar.style.width = `${(currentIdx / files.length) * 100}%`;
+                const file = files[i];
+                
+                try {
+                    const base64 = await new Promise(r => {
+                        const rd = new FileReader();
+                        rd.onload = ev => r(ev.target.result.split(',')[1]);
+                        rd.readAsDataURL(file);
+                    });
+
+                    // Serverless call targeting gemini-2.5-flash-preview-09-2025
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [
+                                { text: "Extract donation metrics: weight (lbs), bp_sys, bp_dia, pulse (bpm), temp (F), protein (g/dl), hematocrit (%), date (YYYY-MM-DD), bank_balance ($), and earnings ($). Output strictly as a flat JSON object with standard keys." },
+                                { inlineData: { mimeType: file.type, data: base64 } }
+                            ] }],
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+
+                    const result = await res.json();
+                    const entry = JSON.parse(result.candidates[0].content.parts[0].text);
+                    const exists = plasmaRecords.some(r => r.data && r.data.date === entry.date);
+
+                    if (!exists && entry.date) {
+                        const prevHash = plasmaRecords[plasmaRecords.length - 1].hash || '0';
+                        plasmaRecords.push(new Block(plasmaRecords.length, entry, prevHash));
+                        successCount++;
+                    }
+                } catch (err) {
+                    console.error("AI Node Extraction Error: ", err);
+                }
+            }
+
+            status.textContent = `Syncing Blockchain...`;
+            saveState();
+            verifyChainIntegrity();
+            refreshUI();
+            setTimeout(() => { container.classList.add('hidden'); e.target.value = ''; }, 2000);
+            showNotification(`${successCount} Block-Nodes Mined`);
+        }
+
+        // 12. Exercise & Workout Module Scripting
+        function renderWorkouts() {
+            const list = document.getElementById('exercise-history-list');
+            const count = document.getElementById('workout-count');
+            if (!list) return;
+            count.textContent = `${workouts.length} ENTRIES`;
+
+            if (workouts.length === 0) {
+                list.innerHTML = `<div class="text-center py-10 text-slate-300 text-xs font-medium">No training data detected.</div>`;
+                return;
+            }
+
+            list.innerHTML = workouts.map(w => `
+                <div class="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="px-2 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-lg uppercase">${w.type}</span>
+                            <h4 class="text-xs font-black text-slate-900 mt-2">${w.date}</h4>
+                        </div>
+                        <button onclick="deleteWorkout('${w.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all text-[10px] font-bold">REMOVE</button>
+                    </div>
+                    <p class="text-[11px] text-slate-500 leading-relaxed font-medium whitespace-pre-wrap">${w.notes || 'No session notes.'}</p>
+                </div>`).join('');
+        }
+
+        function deleteWorkout(id) {
+            workouts = workouts.filter(w => w.id !== id);
+            saveState();
+            renderWorkouts();
+        }
+
+        document.getElementById('workout-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            workouts.unshift({ 
+                id: Math.random().toString(36).substr(2, 9), 
+                date: document.getElementById('exercise-date').value, 
+                type: document.getElementById('exercise-type').value, 
+                notes: document.getElementById('exercise-notes').value 
+            });
+            workouts.sort((a,b) => new Date(b.date) - new Date(a.date));
+            saveState();
+            renderWorkouts();
+            e.target.reset();
+            document.getElementById('exercise-date').valueAsDate = new Date();
+        });
+
+        function manualRefresh() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('spin');
+            loadState();
+            refreshUI();
+            setTimeout(() => icon.classList.remove('spin'), 1000);
+            showNotification("Ledger Integrity Verified");
+        }
+
+        // On Load Page Configurations
+        window.onload = () => {
+            loadState();
+            document.getElementById('log-date').valueAsDate = new Date();
+            const exDate = document.getElementById('exercise-date');
+            if(exDate) exDate.valueAsDate = new Date();
+            refreshUI();
+        };
+    </script>
+</body>
+</html>
