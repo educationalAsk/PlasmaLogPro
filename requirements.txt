@@ -1,0 +1,34 @@
+==============================================================================
+
+PlasmaLog Pro - Development & Testing Dependencies
+
+==============================================================================
+
+Core AI & Vision Sandbox Testing
+
+Used for prototyping the Gemini 2.5 Flash prompts and OCR pipelines offline
+
+google-generativeai>=0.4.0
+Pillow>=10.2.0
+
+Cryptographic Utilities
+
+For matching local CryptoJS SHA-256 validation in Python test suites
+
+cryptography>=42.0.0
+
+Lightweight Local Web Server
+
+Provides a reliable local environment to test Web3 wallet integrations
+
+and local JSON loads without browser CORS limitations
+
+Flask>=3.0.0
+Werkzeug>=3.0.0
+
+Code Quality & Formatting
+
+Keeps your repository clean and matching open-source standards
+
+flake8>=7.0.0
+black>=24.1.0
